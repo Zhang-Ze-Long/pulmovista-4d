@@ -207,7 +207,7 @@ const App: React.FC = () => {
             <div className="bg-slate-800/40 border border-slate-700 p-4 rounded-xl shadow-lg">
               <div className="flex justify-between items-end mb-4 px-1">
                 <h4 className="text-[10px] font-bold text-slate-400 uppercase">光通量呼吸信号 (OFx Dynamics)</h4>
-                <span className="text-[9px] text-emerald-400 font-mono">Φ(t) > 0: 吸气</span>
+                <span className="text-[9px] text-emerald-400 font-mono">Φ(t) &gt; 0: 吸气</span>
               </div>
               <div className="h-44">
                 <ResponsiveContainer width="100%" height="100%">
