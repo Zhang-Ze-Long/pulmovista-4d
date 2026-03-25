@@ -1,0 +1,7 @@
+{
+  "name": "肺动维 4D (PulmoVista 4D) - 肺部运动分析仪",
+  "description": "一个用于分析动态 MRI 肺部呼吸序列 (2D+t) 的高保真医疗可视化平台，具有 3D 重建、横膈膜偏移追踪和临床病理评估功能。",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
