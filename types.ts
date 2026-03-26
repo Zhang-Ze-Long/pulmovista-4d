@@ -50,6 +50,7 @@ export interface DiagnosisResult {
   overallScore: number;
   findings: Finding[];
   recommendations: string[];
+  regionalFindings: RegionalFinding[];
 }
 
 export interface Finding {
@@ -59,4 +60,14 @@ export interface Finding {
   value: number;
   threshold: number;
   indicator: string;
+}
+
+export interface RegionalFinding {
+  region: string;
+  position: string;
+  actualAmplitude: number;
+  expectedAmplitude: number;
+  ratio: number;
+  status: 'normal' | 'reduced' | 'severely_reduced';
+  description: string;
 }

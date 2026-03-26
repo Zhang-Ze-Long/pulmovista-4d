@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { AnalysisResults, SeriesKey, DiagnosisResult } from './types';
+import { AnalysisResults, SeriesKey, DiagnosisResult, RegionalFinding } from './types';
 import { getSimulatedData } from './services/dataSimulator';
 import { processDroppedEntries } from './services/fileProcessor';
 import { reconstructVolume } from './services/volumeReconstructor';
@@ -364,6 +364,32 @@ const App: React.FC = () => {
                     ))}
                   </ul>
                 </div>
+
+                {diagnosis.regionalFindings.length > 0 && (
+                  <div className="pt-2 border-t border-slate-700">
+                    <div className="text-[9px] text-slate-500 uppercase mb-2">区域通气分析</div>
+                    <div className="space-y-1 max-h-40 overflow-y-auto">
+                      {diagnosis.regionalFindings.filter(f => f.status !== 'normal').length > 0 ? (
+                        diagnosis.regionalFindings.filter(f => f.status !== 'normal').map((region, idx) => (
+                          <div key={idx} className={`text-[9px] p-2 rounded ${
+                            region.status === 'severely_reduced' ? 'bg-red-500/20' : 'bg-amber-500/20'
+                          }`}>
+                            <div className="flex justify-between">
+                              <span className="text-slate-300 font-medium">{region.region}</span>
+                              <span className={region.status === 'severely_reduced' ? 'text-red-400' : 'text-amber-400'}>
+                                {region.status === 'severely_reduced' ? '严重受限' : '轻度减弱'}
+                              </span>
+                            </div>
+                            <div className="text-slate-500 mt-1">{region.description}</div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-[9px] text-slate-500">所有区域通气正常</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
               </div>
             )}
 
