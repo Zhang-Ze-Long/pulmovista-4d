@@ -46,28 +46,15 @@ export interface AnalysisResults {
 export type SeriesKey = 'series1' | 'series2' | 'series3';
 
 export interface DiagnosisResult {
-  overallStatus: 'normal' | 'warning' | 'abnormal';
+  overallStatus: 'normal' | 'abnormal';
   overallScore: number;
   findings: Finding[];
   recommendations: string[];
-  regionalFindings: RegionalFinding[];
 }
 
 export interface Finding {
   category: string;
-  severity: 'normal' | 'mild' | 'moderate' | 'severe';
-  description: string;
+  status: 'normal' | 'abnormal';
   value: number;
-  threshold: number;
-  indicator: string;
-}
-
-export interface RegionalFinding {
-  region: string;
-  position: string;
-  actualAmplitude: number;
-  expectedAmplitude: number;
-  ratio: number;
-  status: 'normal' | 'reduced' | 'severely_reduced';
   description: string;
 }

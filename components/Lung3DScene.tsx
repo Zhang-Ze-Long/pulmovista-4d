@@ -29,8 +29,8 @@ const SlicePlane: React.FC<PlaneProps> = ({ seriesKey, data, frameIdx, position,
     return tex;
   }, []);
 
-  useFrame(() => {
-    if (!texture || !frame) return;
+  useEffect(() => {
+    if (!frame) return;
     const pixelData = frame.maskData;
     const rgba = texture.image.data;
     const rBase = parseInt(color.slice(1, 3), 16);
@@ -50,7 +50,7 @@ const SlicePlane: React.FC<PlaneProps> = ({ seriesKey, data, frameIdx, position,
       }
     }
     texture.needsUpdate = true;
-  });
+  }, [frame, texture, color]);
 
   // 计算该序列肺尖相对于冠状面肺尖的偏移量
   const currentApexZ = (0.5 - series.avgApexPos / MASK_SIZE) * 100;

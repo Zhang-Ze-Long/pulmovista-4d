@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { AnalysisResults, SeriesKey, DiagnosisResult, RegionalFinding } from './types';
+import { AnalysisResults, SeriesKey, DiagnosisResult } from './types';
 import { getSimulatedData } from './services/dataSimulator';
 import { processDroppedEntries } from './services/fileProcessor';
 import { reconstructVolume } from './services/volumeReconstructor';
@@ -316,80 +316,31 @@ const App: React.FC = () => {
             {diagnosis && (
               <div className="bg-slate-800/60 border border-slate-700 p-4 rounded-xl space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold uppercase text-slate-300">AI 诊断结果</h3>
+                  <h3 className="text-xs font-bold uppercase text-slate-300">呼吸功能诊断</h3>
                   <div className={`px-3 py-1 rounded-full text-xs font-bold ${
-                    diagnosis.overallStatus === 'normal' ? 'bg-emerald-500/20 text-emerald-400' :
-                    diagnosis.overallStatus === 'warning' ? 'bg-amber-500/20 text-amber-400' :
-                    'bg-red-500/20 text-red-400'
+                    diagnosis.overallStatus === 'normal' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
                   }`}>
-                    {diagnosis.overallStatus === 'normal' ? '正常' :
-                     diagnosis.overallStatus === 'warning' ? '需注意' : '异常'}
+                    {diagnosis.overallStatus === 'normal' ? '正常' : '呼吸受限'}
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
-                    <div className={`h-full transition-all ${
-                      diagnosis.overallScore >= 80 ? 'bg-emerald-500' :
-                      diagnosis.overallScore >= 60 ? 'bg-amber-500' : 'bg-red-500'
-                    }`} style={{ width: `${diagnosis.overallScore}%` }} />
-                  </div>
-                  <span className="text-xs font-mono text-slate-400">{diagnosis.overallScore}分</span>
-                </div>
-
                 <div className="space-y-2">
                   {diagnosis.findings.map((finding, idx) => (
-                    <div key={idx} className="flex items-start gap-2 text-[10px]">
-                      <span className={`w-1.5 h-1.5 mt-1 rounded-full flex-shrink-0 ${
-                        finding.severity === 'normal' ? 'bg-emerald-500' :
-                        finding.severity === 'mild' ? 'bg-amber-500' :
-                        finding.severity === 'moderate' ? 'bg-orange-500' : 'bg-red-500'
+                    <div key={idx} className="flex items-center gap-2 text-[10px]">
+                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                        finding.status === 'normal' ? 'bg-emerald-500' : 'bg-red-500'
                       }`} />
-                      <div>
-                        <span className="text-slate-300 font-medium">{finding.category}:</span>
-                        <span className="text-slate-400 ml-1">{finding.description}</span>
-                      </div>
+                      <span className="text-slate-300">{finding.description}</span>
                     </div>
                   ))}
                 </div>
 
                 <div className="pt-2 border-t border-slate-700">
-                  <div className="text-[9px] text-slate-500 uppercase mb-1">建议</div>
-                  <ul className="text-[10px] text-slate-300 space-y-1">
-                    {diagnosis.recommendations.map((rec, idx) => (
-                      <li key={idx} className="flex items-start gap-1">
-                        <span className="text-blue-400">•</span>
-                        {rec}
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="text-[9px] text-slate-500 uppercase mb-1">结论</div>
+                  <p className="text-[10px] text-slate-300">
+                    {diagnosis.recommendations[0]}
+                  </p>
                 </div>
-
-                {diagnosis.regionalFindings.length > 0 && (
-                  <div className="pt-2 border-t border-slate-700">
-                    <div className="text-[9px] text-slate-500 uppercase mb-2">区域通气分析</div>
-                    <div className="space-y-1 max-h-40 overflow-y-auto">
-                      {diagnosis.regionalFindings.filter(f => f.status !== 'normal').length > 0 ? (
-                        diagnosis.regionalFindings.filter(f => f.status !== 'normal').map((region, idx) => (
-                          <div key={idx} className={`text-[9px] p-2 rounded ${
-                            region.status === 'severely_reduced' ? 'bg-red-500/20' : 'bg-amber-500/20'
-                          }`}>
-                            <div className="flex justify-between">
-                              <span className="text-slate-300 font-medium">{region.region}</span>
-                              <span className={region.status === 'severely_reduced' ? 'text-red-400' : 'text-amber-400'}>
-                                {region.status === 'severely_reduced' ? '严重受限' : '轻度减弱'}
-                              </span>
-                            </div>
-                            <div className="text-slate-500 mt-1">{region.description}</div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-[9px] text-slate-500">所有区域通气正常</div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
               </div>
             )}
 
