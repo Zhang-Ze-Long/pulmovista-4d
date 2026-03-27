@@ -51,6 +51,7 @@ export interface DiagnosisResult {
   findings: Finding[];
   recommendations: string[];
   restrictedRegions: RestrictedRegion[];
+  analysis: AnalysisDetail;
 }
 
 export interface Finding {
@@ -64,4 +65,13 @@ export interface RestrictedRegion {
   name: string;
   location: string;
   severity: number;
+}
+
+export interface AnalysisDetail {
+  leftAmp: number;
+  rightAmp: number;
+  asymmetry: number;
+  globalAmp: number;
+  variance: number;
+  coherence: number;
 }

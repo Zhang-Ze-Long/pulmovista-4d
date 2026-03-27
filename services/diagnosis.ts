@@ -6,6 +6,7 @@ export interface DiagnosisResult {
   findings: Finding[];
   recommendations: string[];
   restrictedRegions: RestrictedRegion[];
+  analysis: AnalysisDetail;
 }
 
 export interface Finding {
@@ -21,20 +22,38 @@ export interface RestrictedRegion {
   severity: number;
 }
 
-const analyzeRestrictedRegions = (
-  amplitudes: number[],
-  regionName: string
-): RestrictedRegion[] => {
-  if (amplitudes.length === 0) return [];
+export interface AnalysisDetail {
+  leftAmp: number;
+  rightAmp: number;
+  asymmetry: number;
+  globalAmp: number;
+  variance: number;
+  coherence: number;
+}
+
+const calculateStats = (amplitudes: number[]) => {
+  if (amplitudes.length === 0) return { mean: 0, std: 0, cv: 0, max: 0, min: 0 };
   
-  const globalMean = amplitudes.reduce((a, b) => a + b, 0) / amplitudes.length;
-  if (globalMean === 0) return [];
+  const mean = amplitudes.reduce((a, b) => a + b, 0) / amplitudes.length;
+  const variance = amplitudes.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / amplitudes.length;
+  const std = Math.sqrt(variance);
+  const cv = mean > 0 ? std / mean : 0;
+  const max = Math.max(...amplitudes);
+  const min = Math.min(...amplitudes);
+  
+  return { mean, std, cv, max, min };
+};
+
+const checkRegionalAnomaly = (amplitudes: number[], regionName: string): { isAnomaly: boolean, severity: number } => {
+  if (amplitudes.length < 10) return { isAnomaly: false, severity: 0 };
+  
+  const stats = calculateStats(amplitudes);
+  if (stats.mean === 0) return { isAnomaly: false, severity: 0 };
   
   const n = amplitudes.length;
-  const segments = 5;
-  const segmentSize = Math.floor(n / segments);
+  const segmentSize = Math.floor(n / 5);
   
-  const regions = [
+  const segments = [
     { name: regionName === 'coronal' ? '右肺上区' : '肺尖区', start: 0, end: segmentSize },
     { name: regionName === 'coronal' ? '右肺中区' : '上肺区', start: segmentSize, end: segmentSize * 2 },
     { name: regionName === 'coronal' ? '右肺下区' : '中肺区', start: segmentSize * 2, end: segmentSize * 3 },
@@ -42,91 +61,163 @@ const analyzeRestrictedRegions = (
     { name: regionName === 'coronal' ? '左肺下区' : '横膈区', start: segmentSize * 4, end: n },
   ];
   
-  const restricted: RestrictedRegion[] = [];
-  
-  for (const region of regions) {
-    const regionAmps = amplitudes.slice(region.start, region.end);
-    if (regionAmps.length === 0) continue;
+  for (const seg of segments) {
+    const segAmps = amplitudes.slice(seg.start, seg.end);
+    if (segAmps.length === 0) continue;
     
-    const meanAmp = regionAmps.reduce((a, b) => a + b, 0) / regionAmps.length;
-    const ratio = meanAmp / globalMean;
+    const segMean = segAmps.reduce((a, b) => a + b, 0) / segAmps.length;
+    const zScore = Math.abs((segMean - stats.mean) / (stats.std || 1));
     
-    if (ratio < 0.5) {
-      restricted.push({
-        name: region.name,
-        location: region.name,
-        severity: Math.round((1 - ratio) * 100)
-      });
+    if (zScore > 2.5) {
+      return { isAnomaly: true, severity: Math.min(100, Math.round(zScore * 30)) };
     }
   }
   
-  return restricted.sort((a, b) => b.severity - a.severity);
+  return { isAnomaly: false, severity: 0 };
+};
+
+const analyzeBreathingPattern = (data: AnalysisResults): {
+  regularity: number;
+  amplitudeStability: number;
+  synchronization: number;
+} => {
+  const frames = data.series3.frames;
+  if (frames.length < 5) {
+    return { regularity: 100, amplitudeStability: 100, synchronization: 100 };
+  }
+  
+  const areas = frames.map(f => f.lungArea);
+  const mean = areas.reduce((a, b) => a + b, 0) / areas.length;
+  const amplitude = Math.max(...areas) - Math.min(...areas);
+  
+  const regularity = Math.min(100, (amplitude / (mean || 1)) * 50);
+  
+  let signChanges = 0;
+  for (let i = 1; i < areas.length; i++) {
+    if ((areas[i] - areas[i-1]) > 0 !== (areas[i-1] - areas[i-2]) > 0) {
+      signChanges++;
+    }
+  }
+  const expectedCycles = Math.floor(frames.length / 3);
+  const amplitudeStability = expectedCycles > 0 ? Math.min(100, Math.max(0, 100 - Math.abs(signChanges - expectedCycles) * 10)) : 100;
+  
+  const series1Amp = data.series1.amplitude;
+  const series2Amp = data.series2.amplitude;
+  const syncRatio = series1Amp > 0 && series2Amp > 0 ? Math.min(series1Amp, series2Amp) / Math.max(series1Amp, series2Amp) : 0;
+  const synchronization = Math.round(syncRatio * 100);
+  
+  return { regularity, amplitudeStability, synchronization };
 };
 
 export const diagnose = (data: AnalysisResults): DiagnosisResult => {
   const findings: Finding[] = [];
   const restrictedRegions: RestrictedRegion[] = [];
   
-  const globalAmp = (data.series1.amplitude + data.series2.amplitude) / 2;
-  
-  const ampThreshold = 300;
-  if (globalAmp < ampThreshold) {
-    findings.push({ category: '整体运动', status: 'abnormal', value: globalAmp, description: `运动幅度偏低` });
-  } else {
-    findings.push({ category: '整体运动', status: 'normal', value: globalAmp, description: `运动幅度正常` });
-  }
-  
   const amp1 = data.series1.amplitude;
   const amp2 = data.series2.amplitude;
+  const globalAmp = (amp1 + amp2) / 2;
+  
   const asymmetry = Math.abs(amp1 - amp2) / Math.max(amp1, amp2, 1);
   
-  if (asymmetry > 0.5) {
-    findings.push({ category: '左右对称性', status: 'abnormal', value: asymmetry, description: `左右不对称` });
+  const leftStats = calculateStats(data.series1.regionalAmplitudes);
+  const rightStats = calculateStats(data.series2.regionalAmplitudes);
+  const coronalStats = calculateStats(data.series3.regionalAmplitudes);
+  
+  const avgCV = (leftStats.cv + rightStats.cv + coronalStats.cv) / 3;
+  
+  const pattern = analyzeBreathingPattern(data);
+  
+  let abnormalScore = 0;
+  let totalScore = 0;
+  
+  if (globalAmp < 250) {
+    findings.push({ category: '整体幅度', status: 'abnormal', value: globalAmp, description: '运动幅度过低' });
+    abnormalScore += 3;
+  } else if (globalAmp > 3500) {
+    findings.push({ category: '整体幅度', status: 'abnormal', value: globalAmp, description: '运动幅度过高' });
+    abnormalScore += 2;
   } else {
-    findings.push({ category: '左右对称性', status: 'normal', value: asymmetry, description: `左右对称` });
+    findings.push({ category: '整体幅度', status: 'normal', value: globalAmp, description: '运动幅度正常' });
   }
+  totalScore += 3;
   
-  const coronalRestricted = analyzeRestrictedRegions(data.series3.regionalAmplitudes, 'coronal');
-  const leftRestricted = analyzeRestrictedRegions(data.series1.regionalAmplitudes, 'sagittal');
-  const rightRestricted = analyzeRestrictedRegions(data.series2.regionalAmplitudes, 'sagittal');
+  if (asymmetry > 0.4) {
+    findings.push({ category: '左右对称', status: 'abnormal', value: asymmetry, description: '左右不对称明显' });
+    abnormalScore += 3;
+  } else {
+    findings.push({ category: '左右对称', status: 'normal', value: asymmetry, description: '左右对称' });
+  }
+  totalScore += 3;
   
-  restrictedRegions.push(...coronalRestricted, ...leftRestricted, ...rightRestricted);
+  if (avgCV > 0.6) {
+    findings.push({ category: '运动协调性', status: 'abnormal', value: avgCV, description: '区域运动不协调' });
+    abnormalScore += 2;
+  } else {
+    findings.push({ category: '运动协调性', status: 'normal', value: avgCV, description: '区域运动协调' });
+  }
+  totalScore += 2;
   
-  const abnormalFindingsCount = findings.filter(f => f.status === 'abnormal').length;
-  const severeRestrictedCount = restrictedRegions.filter(r => r.severity > 60).length;
+  if (pattern.synchronization < 60) {
+    findings.push({ category: '呼吸同步', status: 'abnormal', value: pattern.synchronization, description: '左右呼吸不同步' });
+    abnormalScore += 2;
+  } else {
+    findings.push({ category: '呼吸同步', status: 'normal', value: pattern.synchronization, description: '呼吸同步正常' });
+  }
+  totalScore += 2;
+  
+  const leftAnomaly = checkRegionalAnomaly(data.series1.regionalAmplitudes, 'sagittal');
+  const rightAnomaly = checkRegionalAnomaly(data.series2.regionalAmplitudes, 'sagittal');
+  const coronalAnomaly = checkRegionalAnomaly(data.series3.regionalAmplitudes, 'coronal');
+  
+  if (leftAnomaly.isAnomaly) {
+    restrictedRegions.push({ name: '左侧异常区', location: '左侧', severity: leftAnomaly.severity });
+    abnormalScore += 1;
+  }
+  if (rightAnomaly.isAnomaly) {
+    restrictedRegions.push({ name: '右侧异常区', location: '右侧', severity: rightAnomaly.severity });
+    abnormalScore += 1;
+  }
+  if (coronalAnomaly.isAnomaly) {
+    restrictedRegions.push({ name: '中部异常区', location: '中部', severity: coronalAnomaly.severity });
+    abnormalScore += 1;
+  }
+  totalScore += 3;
+  
+  const score = totalScore > 0 ? Math.max(0, Math.round((1 - abnormalScore / totalScore) * 100)) : 100;
   
   let overallStatus: DiagnosisResult['overallStatus'] = 'normal';
-  
-  if (abnormalFindingsCount >= 2) {
-    overallStatus = 'abnormal';
-  } else if (severeRestrictedCount >= 2) {
+  if (abnormalScore >= 4 || (abnormalScore >= 2 && restrictedRegions.length >= 2)) {
     overallStatus = 'abnormal';
   }
   
-  const score = Math.max(0, Math.round((1 - (abnormalFindingsCount * 0.4 + severeRestrictedCount * 0.3) / 2) * 100));
-  
   const recommendations: string[] = [];
-  
   if (overallStatus === 'normal') {
     recommendations.push('呼吸功能正常');
   } else {
+    const abnormalItems = findings.filter(f => f.status === 'abnormal').map(f => f.category);
+    if (abnormalItems.length > 0) {
+      recommendations.push(`异常: ${abnormalItems.join('、')}`);
+    }
     if (restrictedRegions.length > 0) {
-      const severeOnes = restrictedRegions.filter(r => r.severity > 40);
-      if (severeOnes.length > 0) {
-        recommendations.push(`受限区域: ${severeOnes.map(r => r.name).join('、')}`);
-      } else {
-        recommendations.push('部分区域通气稍弱');
-      }
-    } else {
-      recommendations.push('整体运动异常');
+      recommendations.push(`建议复查: ${restrictedRegions.map(r => r.name).join('、')}`);
     }
   }
+  
+  const analysis: AnalysisDetail = {
+    leftAmp: Math.round(amp1),
+    rightAmp: Math.round(amp2),
+    asymmetry: Math.round(asymmetry * 100),
+    globalAmp: Math.round(globalAmp),
+    variance: Math.round(avgCV * 100),
+    coherence: pattern.synchronization
+  };
   
   return {
     overallStatus,
     overallScore: score,
     findings,
     recommendations,
-    restrictedRegions
+    restrictedRegions,
+    analysis
   };
 };
