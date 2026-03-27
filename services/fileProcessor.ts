@@ -8,36 +8,33 @@ const naturalSort = (a: string, b: string) => {
 };
 
 const detectSliceType = (maskData: Uint8ClampedArray, width: number, height: number): 'coronal' | 'sagittal' => {
-  const threshold = 0.15;
-  const centerX = width / 2;
-  const centerRegionWidth = width * 0.15;
-  
-  let leftLungPixels = 0;
-  let rightLungPixels = 0;
+  const visited = new Uint8Array(width * height);
+  let connectedComponents = 0;
   
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const idx = y * width + x;
-      if (maskData[idx] > 0) {
-        if (x < centerX - centerRegionWidth / 2) {
-          leftLungPixels++;
-        } else if (x > centerX + centerRegionWidth / 2) {
-          rightLungPixels++;
+      if (maskData[idx] > 0 && visited[idx] === 0) {
+        connectedComponents++;
+        const stack = [idx];
+        while (stack.length > 0) {
+          const curr = stack.pop()!;
+          if (visited[curr]) continue;
+          visited[curr] = 1;
+          const cx = curr % width;
+          const cy = Math.floor(curr / width);
+          if (cx > 0 && maskData[curr - 1] > 0 && visited[curr - 1] === 0) stack.push(curr - 1);
+          if (cx < width - 1 && maskData[curr + 1] > 0 && visited[curr + 1] === 0) stack.push(curr + 1);
+          if (cy > 0 && maskData[curr - width] > 0 && visited[curr - width] === 0) stack.push(curr - width);
+          if (cy < height - 1 && maskData[curr + width] > 0 && visited[curr + width] === 0) stack.push(curr + width);
         }
       }
     }
   }
   
-  const totalLungPixels = leftLungPixels + rightLungPixels;
-  if (totalLungPixels === 0) return 'sagittal';
-  
-  const leftRatio = leftLungPixels / totalLungPixels;
-  const rightRatio = rightLungPixels / totalLungPixels;
-  
-  if (leftRatio > threshold && rightRatio > threshold) {
+  if (connectedComponents >= 2) {
     return 'coronal';
   }
-  
   return 'sagittal';
 };
 
