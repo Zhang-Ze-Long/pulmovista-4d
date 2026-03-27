@@ -50,6 +50,7 @@ export interface DiagnosisResult {
   overallScore: number;
   findings: Finding[];
   recommendations: string[];
+  restrictedRegions: RestrictedRegion[];
 }
 
 export interface Finding {
@@ -57,4 +58,10 @@ export interface Finding {
   status: 'normal' | 'abnormal';
   value: number;
   description: string;
+}
+
+export interface RestrictedRegion {
+  name: string;
+  location: string;
+  severity: number;
 }

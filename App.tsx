@@ -70,12 +70,19 @@ const App: React.FC = () => {
   const regionalData = useMemo(() => {
     if (!data) return { coronal: [], left: [], right: [] };
     
-    const format = (amps: number[]) => amps.map((val, idx) => {
+    const format = (amps: number[], isCoronal: boolean) => amps.map((val, idx) => {
       let label = `Pt ${idx}`;
-      if (idx === 0) label = "Apex";
-      else if (idx === 25) label = "Left Wall";
-      else if (idx === 50) label = "Diaphragm";
-      else if (idx === 75) label = "Right Wall";
+      if (isCoronal) {
+        if (idx === 0) label = "R-Upper";
+        else if (idx === 33) label = "R-Lower";
+        else if (idx === 50) label = "L-Upper";
+        else if (idx === 83) label = "L-Lower";
+      } else {
+        if (idx === 0) label = "Apex";
+        else if (idx === 20) label = "Upper";
+        else if (idx === 60) label = "Lower";
+        else if (idx === 80) label = "Diaphragm";
+      }
       
       return {
         index: idx,
@@ -85,9 +92,9 @@ const App: React.FC = () => {
     });
 
     return {
-      coronal: format(data.series3.regionalAmplitudes),
-      left: format(data.series1.regionalAmplitudes),
-      right: format(data.series2.regionalAmplitudes)
+      coronal: format(data.series3.regionalAmplitudes, true),
+      left: format(data.series1.regionalAmplitudes, false),
+      right: format(data.series2.regionalAmplitudes, false)
     };
   }, [data]);
 
@@ -229,28 +236,6 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {/* Tidal Volume Graph */}
-            <div className="bg-slate-800/40 border border-slate-700 p-4 rounded-xl shadow-lg">
-              <h4 className="text-[10px] font-bold text-slate-400 uppercase mb-4 px-1">模拟潮气量 (Integrated Flux ∫Φdt)</h4>
-              <div className="h-44">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={ofxData}>
-                    <defs>
-                      <linearGradient id="volGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                    <XAxis dataKey="frame" hide />
-                    <YAxis fontSize={10} stroke="#64748b" />
-                    <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px' }} />
-                    <Area type="monotone" dataKey="volume" name="潮气量" stroke="#3b82f6" fill="url(#volGrad)" strokeWidth={2} isAnimationActive={false} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
             {/* Regional Analysis Charts with Hover Tracking */}
             <div className="space-y-4 pt-4 border-t border-slate-800">
                <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-1">解剖学区域运动</h3>
@@ -265,7 +250,7 @@ const App: React.FC = () => {
                       onMouseLeave={() => setHoveredInfo(null)}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                      <XAxis dataKey="index" fontSize={9} interval={24} />
+                      <XAxis dataKey="index" fontSize={9} interval={16} />
                       <YAxis fontSize={9} />
                       <Tooltip labelStyle={{color: '#fff'}} contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px' }} />
                       <Line type="monotone" dataKey="amplitude" name="位移" stroke={COLORS.coronal} strokeWidth={2} dot={false} />
@@ -284,7 +269,7 @@ const App: React.FC = () => {
                       onMouseLeave={() => setHoveredInfo(null)}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                      <XAxis dataKey="index" fontSize={9} interval={24} />
+                      <XAxis dataKey="index" fontSize={9} interval={19} />
                       <YAxis fontSize={9} />
                       <Tooltip labelStyle={{color: '#fff'}} contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px' }} />
                       <Line type="monotone" dataKey="amplitude" name="位移" stroke={COLORS.left} strokeWidth={2} dot={false} />
@@ -303,7 +288,7 @@ const App: React.FC = () => {
                       onMouseLeave={() => setHoveredInfo(null)}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                      <XAxis dataKey="index" fontSize={9} interval={24} />
+                      <XAxis dataKey="index" fontSize={9} interval={19} />
                       <YAxis fontSize={9} />
                       <Tooltip labelStyle={{color: '#fff'}} contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px' }} />
                       <Line type="monotone" dataKey="amplitude" name="位移" stroke={COLORS.right} strokeWidth={2} dot={false} />
@@ -316,7 +301,7 @@ const App: React.FC = () => {
             {diagnosis && (
               <div className="bg-slate-800/60 border border-slate-700 p-4 rounded-xl space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold uppercase text-slate-300">呼吸功能诊断</h3>
+                  <h3 className="text-xs font-bold uppercase text-slate-300">呼吸功能预测</h3>
                   <div className={`px-3 py-1 rounded-full text-xs font-bold ${
                     diagnosis.overallStatus === 'normal' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
                   }`}>
@@ -334,6 +319,20 @@ const App: React.FC = () => {
                     </div>
                   ))}
                 </div>
+
+                {diagnosis.restrictedRegions.length > 0 && (
+                  <div className="pt-2 border-t border-slate-700">
+                    <div className="text-[9px] text-slate-500 uppercase mb-2">受限区域预测</div>
+                    <div className="space-y-1">
+                      {diagnosis.restrictedRegions.slice(0, 5).map((region, idx) => (
+                        <div key={idx} className="flex items-center justify-between text-[10px] bg-red-500/10 p-2 rounded">
+                          <span className="text-slate-300">{region.name}</span>
+                          <span className="text-red-400">严重度: {region.severity}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="pt-2 border-t border-slate-700">
                   <div className="text-[9px] text-slate-500 uppercase mb-1">结论</div>
